@@ -158,15 +158,15 @@ if %errorlevel% neq 0 (
 echo [OK] nodriver_tixcraft.exe built
 echo.
 
-REM Build settings.exe
-echo [3.3] Building settings.exe...
+REM Build TicketsHunter.exe
+echo [3.3] Building TicketsHunter.exe...
 if exist "build" rmdir /s /q "build" >nul 2>&1
 python -m PyInstaller build_scripts\settings.spec --noconfirm >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to build settings.exe
+    echo [ERROR] Failed to build TicketsHunter.exe
     goto :error_exit
 )
-echo [OK] settings.exe built
+echo [OK] TicketsHunter.exe built
 echo.
 
 echo [PHASE 3] Complete - All Executables Built
@@ -186,15 +186,16 @@ echo [OK] Directory created
 echo.
 
 echo [4.2] Copying executables...
-xcopy /Y dist\nodriver_tixcraft\nodriver_tixcraft.exe dist\tickets_hunter\ >nul
-xcopy /Y dist\settings\settings.exe dist\tickets_hunter\ >nul
+xcopy /Y dist\TicketsHunter\TicketsHunter.exe dist\tickets_hunter\ >nul
 echo [OK] 2 executables copied
 echo.
 
-echo [4.3] Merging _internal directories...
-xcopy /E /I /Y dist\nodriver_tixcraft\_internal dist\tickets_hunter\_internal >nul
-xcopy /E /I /Y dist\settings\_internal\* dist\tickets_hunter\_internal >nul
-echo [OK] _internal merged
+echo [4.3] Copying launcher and hidden engine runtimes...
+xcopy /E /I /Y dist\TicketsHunter\_internal dist\tickets_hunter\_internal >nul
+mkdir dist\tickets_hunter\_engine
+xcopy /Y dist\nodriver_tixcraft\nodriver_tixcraft.exe dist\tickets_hunter\_engine\ >nul
+xcopy /E /I /Y dist\nodriver_tixcraft\_internal dist\tickets_hunter\_engine\_internal >nul
+echo [OK] runtimes copied
 echo.
 
 echo [4.4] Copying shared resources...
@@ -251,15 +252,15 @@ echo.
 REM Test 1: Executables exist
 echo Test 1/12: Checking executables exist...
 set /a TEST_COUNT+=1
-if exist "%TEST_DIR%\nodriver_tixcraft.exe" (
-    if exist "%TEST_DIR%\settings.exe" (
+if exist "%TEST_DIR%\_engine\nodriver_tixcraft.exe" (
+    if exist "%TEST_DIR%\TicketsHunter.exe" (
         echo [PASS] All 2 executables exist
         set /a TEST_PASSED+=1
         set "TEST_RESULTS=!TEST_RESULTS![PASS] Test 1: All executables exist%LF%"
     ) else (
-        echo [FAIL] settings.exe missing
+        echo [FAIL] TicketsHunter.exe missing
         set /a TEST_FAILED+=1
-        set "TEST_RESULTS=!TEST_RESULTS![FAIL] Test 1: settings.exe missing%LF%"
+        set "TEST_RESULTS=!TEST_RESULTS![FAIL] Test 1: TicketsHunter.exe missing%LF%"
     )
 ) else (
     echo [FAIL] nodriver_tixcraft.exe missing
@@ -398,24 +399,24 @@ echo [5.2] Executable Launch Tests
 echo ----------------------------------------
 echo.
 
-echo Test 11/11: Testing settings.exe launch...
+echo Test 11/11: Testing TicketsHunter.exe launch...
 echo       ^(Will auto-close in 3 seconds^)
 set /a TEST_COUNT+=1
-if not exist "%TEST_DIR%\settings.exe" (
-    echo [SKIP] settings.exe not found, skipping launch test
+if not exist "%TEST_DIR%\TicketsHunter.exe" (
+    echo [SKIP] TicketsHunter.exe not found, skipping launch test
     set /a TEST_PASSED+=1
     set "TEST_RESULTS=!TEST_RESULTS![SKIP] Test 12: settings not found%LF%"
 ) else (
-    start "" "%TEST_DIR_ABS%\settings.exe" 2>nul
+    start "" "%TEST_DIR_ABS%\TicketsHunter.exe" 2>nul
     timeout /t 3 /nobreak >nul
-    tasklist | findstr /I "settings.exe" >nul
+    tasklist | findstr /I "TicketsHunter.exe" >nul
     if %errorlevel% equ 0 (
-        echo [PASS] settings.exe launched successfully
-        taskkill /F /IM settings.exe >nul 2>&1
+        echo [PASS] TicketsHunter.exe launched successfully
+        taskkill /F /IM TicketsHunter.exe >nul 2>&1
         set /a TEST_PASSED+=1
         set "TEST_RESULTS=!TEST_RESULTS![PASS] Test 12: settings launches%LF%"
     ) else (
-        echo [WARN] settings.exe did not launch ^(may need network^)
+        echo [WARN] TicketsHunter.exe did not launch ^(may need network^)
         set /a TEST_PASSED+=1
         set "TEST_RESULTS=!TEST_RESULTS![WARN] Test 12: settings no launch%LF%"
     )
@@ -477,11 +478,11 @@ echo Generating test report: test_report_%VERSION%.txt
     )
     echo.
     echo Executables:
-    if exist "%TEST_DIR%\nodriver_tixcraft.exe" (
-        for %%A in ("%TEST_DIR%\nodriver_tixcraft.exe") do echo   - nodriver_tixcraft.exe (%%~zA bytes^)
+    if exist "%TEST_DIR%\_engine\nodriver_tixcraft.exe" (
+        for %%A in ("%TEST_DIR%\_engine\nodriver_tixcraft.exe") do echo   - _engine\nodriver_tixcraft.exe (%%~zA bytes^)
     )
-    if exist "%TEST_DIR%\settings.exe" (
-        for %%A in ("%TEST_DIR%\settings.exe") do echo   - settings.exe (%%~zA bytes^)
+    if exist "%TEST_DIR%\TicketsHunter.exe" (
+        for %%A in ("%TEST_DIR%\TicketsHunter.exe") do echo   - TicketsHunter.exe (%%~zA bytes^)
     )
     echo.
     echo ================================================================================

@@ -3,7 +3,7 @@
 # PyInstaller Spec File for Tickets Hunter - Settings Editor (Tornado Web)
 # =============================================================================
 # This spec file builds the Tornado web-based settings editor.
-# Output: dist/settings/settings.exe
+# Output: dist/TicketsHunter/TicketsHunter.exe
 # =============================================================================
 
 import os
@@ -65,12 +65,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,  # This enables folder mode
-    name='settings',  # Output: settings.exe
+    name='TicketsHunter',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,  # Disable UPX compression for stability
-    console=True,  # Show console window for Tornado logs
+    console=False,  # Friendly desktop launch: no terminal window
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
@@ -86,5 +86,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='settings',
+    name='TicketsHunter',
 )
