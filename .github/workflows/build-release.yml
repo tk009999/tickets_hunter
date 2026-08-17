@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: '3.11.9'
 
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Get version from tag
         id: get_version
         shell: bash
@@ -45,15 +50,24 @@ jobs:
           python -c "import ddddocr; import zendriver; import tornado; print('All core packages installed!')"
           python -m PyInstaller --version
 
-      - name: Build executables with PyInstaller
+      - name: Build automation engine with PyInstaller
         run: |
           echo "Building nodriver_tixcraft.exe..."
           python -m PyInstaller build_scripts/nodriver_tixcraft.spec --clean --noconfirm
 
-          echo "Building TicketsHunter.exe..."
-          python -m PyInstaller build_scripts/settings.spec --clean --noconfirm
-
-          echo "All executables built successfully!"
+      - name: Build native WPF desktop application
+        shell: pwsh
+        run: |
+          dotnet publish desktop/TicketsHunter.Desktop/TicketsHunter.Desktop.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            --output dist/desktop
+          if (!(Test-Path "dist/desktop/TicketsHunter.exe")) {
+            throw "TicketsHunter.exe was not generated"
+          }
 
       - name: Create unified directory structure
         shell: cmd
@@ -62,21 +76,13 @@ jobs:
           mkdir dist\tickets_hunter
 
           echo Copying executables...
-          xcopy /Y dist\TicketsHunter\TicketsHunter.exe dist\tickets_hunter\
-
-          echo Copying launcher runtime...
-          xcopy /E /I /Y dist\TicketsHunter\_internal dist\tickets_hunter\_internal
+          xcopy /Y dist\desktop\TicketsHunter.exe dist\tickets_hunter\
 
           echo Hiding automation engine from end users...
           mkdir dist\tickets_hunter\_engine
           xcopy /Y dist\nodriver_tixcraft\nodriver_tixcraft.exe dist\tickets_hunter\_engine\
           xcopy /E /I /Y dist\nodriver_tixcraft\_internal dist\tickets_hunter\_engine\_internal
-
-          echo Copying shared resources from src/...
-          xcopy /E /I /Y src\assets dist\tickets_hunter\assets
-          xcopy /E /I /Y src\www dist\tickets_hunter\www
-          REM settings.json excluded - program generates it automatically
-          REM ddddocr data files are automatically collected by PyInstaller via collect_data_files()
+          xcopy /E /I /Y src\assets dist\tickets_hunter\_engine\assets
 
           echo Copying documentation...
           copy build_scripts\README_Release.txt dist\tickets_hunter\
