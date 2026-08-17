@@ -2113,7 +2113,14 @@ def launch_maxbot(script_name="nodriver_tixcraft", filename="", homepage="", kkt
         # child exits with "unrecognized arguments" (issue #378). The binary
         # needs an absolute path: cwd= sets the child's directory but does not
         # affect how the executable itself is resolved.
+        # Windows release packages expose only TicketsHunter.exe at the root.
+        # Keep the automation engine in an internal folder so non-technical
+        # users do not need to choose between multiple executables.
         binary_path = os.path.join(working_dir, binary_name)
+        if platform.system() == 'Windows':
+            internal_binary_path = os.path.join(working_dir, '_engine', binary_name)
+            if os.path.isfile(internal_binary_path):
+                binary_path = internal_binary_path
         subprocess.Popen([binary_path] + cmd_argument, cwd=working_dir)
     else:
         interpreter_binary = sys.executable

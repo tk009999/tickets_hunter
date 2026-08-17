@@ -1,6 +1,7 @@
 name: Build and Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'  # Trigger on tags like v2025.11.03
@@ -25,7 +26,11 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="dev-${GITHUB_RUN_NUMBER}"
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
@@ -45,7 +50,7 @@ jobs:
           echo "Building nodriver_tixcraft.exe..."
           python -m PyInstaller build_scripts/nodriver_tixcraft.spec --clean --noconfirm
 
-          echo "Building settings.exe..."
+          echo "Building TicketsHunter.exe..."
           python -m PyInstaller build_scripts/settings.spec --clean --noconfirm
 
           echo "All executables built successfully!"
@@ -57,12 +62,15 @@ jobs:
           mkdir dist\tickets_hunter
 
           echo Copying executables...
-          xcopy /Y dist\nodriver_tixcraft\nodriver_tixcraft.exe dist\tickets_hunter\
-          xcopy /Y dist\settings\settings.exe dist\tickets_hunter\
+          xcopy /Y dist\TicketsHunter\TicketsHunter.exe dist\tickets_hunter\
 
-          echo Merging _internal directories...
-          xcopy /E /I /Y dist\nodriver_tixcraft\_internal dist\tickets_hunter\_internal
-          xcopy /E /I /Y dist\settings\_internal\* dist\tickets_hunter\_internal
+          echo Copying launcher runtime...
+          xcopy /E /I /Y dist\TicketsHunter\_internal dist\tickets_hunter\_internal
+
+          echo Hiding automation engine from end users...
+          mkdir dist\tickets_hunter\_engine
+          xcopy /Y dist\nodriver_tixcraft\nodriver_tixcraft.exe dist\tickets_hunter\_engine\
+          xcopy /E /I /Y dist\nodriver_tixcraft\_internal dist\tickets_hunter\_engine\_internal
 
           echo Copying shared resources from src/...
           xcopy /E /I /Y src\assets dist\tickets_hunter\assets
@@ -87,6 +95,13 @@ jobs:
 
           # Display file info
           Get-ChildItem $zipName | Format-List Name, Length
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicketsHunter-Windows-${{ steps.get_version.outputs.VERSION }}
+          path: tickets_hunter_v${{ steps.get_version.outputs.VERSION }}.zip
+          if-no-files-found: error
 
       - name: Extract CHANGELOG for release notes
         id: changelog
@@ -134,6 +149,7 @@ jobs:
           }
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: Tickets Hunter v${{ steps.get_version.outputs.VERSION }}
@@ -159,7 +175,7 @@ jobs:
           retention-days: 7
 
       - name: Notify Discord
-        if: success() && env.DISCORD_WEBHOOK_URL != ''
+        if: startsWith(github.ref, 'refs/tags/v') && success() && env.DISCORD_WEBHOOK_URL != ''
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           VERSION: ${{ steps.get_version.outputs.VERSION }}

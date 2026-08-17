@@ -21,8 +21,8 @@
 1. 解壓縮 ZIP 檔案
    將 tickets_hunter_vXXXX.XX.XX.zip 解壓縮到任意目錄。
 
-2. 執行 settings.exe
-   雙擊 settings.exe，會自動開啟瀏覽器顯示設定介面。
+2. 執行 TicketsHunter.exe
+   雙擊 TicketsHunter.exe，會自動開啟瀏覽器顯示中文設定介面。
 
 3. 在網頁介面進行設定
    - 設定票務平台網址（homepage）
