@@ -87,6 +87,8 @@
             <TextBlock Grid.Column="0" VerticalAlignment="Center" Foreground="#777" Text="設定會自動儲存在這台電腦"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="SaveButton" Content="儲存設定" Click="SaveButton_Click"/>
+                <Button x:Name="LoginButton" Content="先登入 TicketPlus" Click="LoginButton_Click"
+                        ToolTip="開啟專用 Chrome 登入，登入狀態只保存在這台電腦"/>
                 <Button x:Name="StopButton" Content="暫停自動操作" Click="StopButton_Click" IsEnabled="False"
                         ToolTip="暫停後 Chrome 會保留，可以手動登入或操作頁面"/>
                 <Button x:Name="StartButton" Content="開始搶票" Click="StartButton_Click"

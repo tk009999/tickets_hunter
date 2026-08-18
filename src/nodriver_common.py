@@ -1096,7 +1096,17 @@ def get_extension_config(config_dict, args=None):
         raise FileNotFoundError("Could not find or download Chrome browser")
 
     # Normal mode: auto-detect (host=None, port=None) to let NoDriver start the browser
-    conf = Config(browser_args=browser_args, sandbox=sandbox, headless=config_dict["advanced"]["headless"], browser_executable_path=chrome_path)
+    user_data_dir = config_dict.get("advanced", {}).get("user_data_dir", "").strip()
+    if user_data_dir:
+        os.makedirs(user_data_dir, exist_ok=True)
+
+    conf = Config(
+        user_data_dir=user_data_dir or None,
+        browser_args=browser_args,
+        sandbox=sandbox,
+        headless=config_dict["advanced"]["headless"],
+        browser_executable_path=chrome_path,
+    )
     return conf
 
 def nodriver_overwrite_prefs(conf):

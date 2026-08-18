@@ -64,6 +64,7 @@ internal static class DefaultConfig
         "hide_some_image": false,
         "block_facebook_network": false,
         "headless": false,
+        "user_data_dir": "",
         "verbose": false,
         "show_timestamp": true,
         "auto_guess_options": false,

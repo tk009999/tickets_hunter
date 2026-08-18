@@ -14,8 +14,11 @@ public partial class MainWindow : Window
 {
     private readonly string _dataDirectory;
     private readonly string _configPath;
+    private readonly string _loginConfigPath;
+    private readonly string _browserProfilePath;
     private Process? _engineProcess;
     private bool _isPaused;
+    private bool _isLoginMode;
 
     private string PauseFlagPath => Path.Combine(
         AppContext.BaseDirectory, "_engine", "instances", "desktop", "MAXBOT_INT28_IDLE.txt");
@@ -28,6 +31,8 @@ public partial class MainWindow : Window
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "TicketsHunter");
         _configPath = Path.Combine(_dataDirectory, "desktop.json");
+        _loginConfigPath = Path.Combine(_dataDirectory, "ticketplus-login.json");
+        _browserProfilePath = Path.Combine(_dataDirectory, "ChromeProfile");
         Directory.CreateDirectory(_dataDirectory);
         LoadSavedSettings();
         Closing += Window_Closing;
@@ -60,6 +65,16 @@ public partial class MainWindow : Window
         config["area_auto_select"]!["area_keyword"] = FormatKeyword(AreaKeywordsTextBox.Text);
         config["area_auto_select"]!["mode"] = SelectedMode();
         config["keyword_exclude"] = FormatKeyword(ExcludeKeywordsTextBox.Text);
+        config["advanced"]!["user_data_dir"] = _browserProfilePath;
+        return config;
+    }
+
+    private JsonObject BuildLoginConfig()
+    {
+        var config = BuildConfig();
+        config["homepage"] = "https://ticketplus.com.tw/";
+        config["date_auto_select"]!["enable"] = false;
+        config["area_auto_select"]!["enable"] = false;
         return config;
     }
 
@@ -117,6 +132,35 @@ public partial class MainWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e) => SaveSettings(true);
 
+    private void LoginButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_engineProcess is { HasExited: false })
+        {
+            if (_isLoginMode)
+            {
+                RequestEngineQuit("login");
+                AppendLog("正在儲存 TicketPlus 登入狀態…");
+                LoginButton.IsEnabled = false;
+                return;
+            }
+
+            MessageBox.Show("請先停止目前的搶票程式。", "程式正在執行",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        File.WriteAllText(_loginConfigPath, BuildLoginConfig().ToJsonString(new JsonSerializerOptions
+        {
+            WriteIndented = true
+        }), new UTF8Encoding(false));
+
+        LogTextBox.Clear();
+        AppendLog("正在開啟 TicketPlus 登入頁…");
+        AppendLog("請在 Chrome 完成登入，然後回到這裡按「登入完成」。");
+        MainTabs.SelectedIndex = 2;
+        LaunchEngine(_loginConfigPath, "login", true);
+    }
+
     private void StartButton_Click(object sender, RoutedEventArgs e)
     {
         if (_engineProcess is { HasExited: false })
@@ -127,6 +171,11 @@ public partial class MainWindow : Window
         }
         if (!SaveSettings(false)) return;
 
+        LaunchEngine(_configPath, "desktop", false);
+    }
+
+    private void LaunchEngine(string configPath, string instance, bool loginMode)
+    {
         var enginePath = Path.Combine(AppContext.BaseDirectory, "_engine", "nodriver_tixcraft.exe");
         if (!File.Exists(enginePath))
         {
@@ -135,11 +184,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        LogTextBox.Clear();
+        var staleQuitFlag = Path.Combine(AppContext.BaseDirectory, "_engine", "instances", instance,
+            "MAXBOT_INT28_QUIT.txt");
+        if (File.Exists(staleQuitFlag)) File.Delete(staleQuitFlag);
+
+        _isLoginMode = loginMode;
         SetPaused(false);
-        AppendLog("正在啟動本機 Chrome…");
-        SetRunningState(true, "正在搶票");
-        MainTabs.SelectedIndex = 2;
+        SetRunningState(true, loginMode ? "請在 Chrome 登入 TicketPlus" : "正在搶票");
 
         var startInfo = new ProcessStartInfo(enginePath)
         {
@@ -151,8 +202,8 @@ public partial class MainWindow : Window
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
-        startInfo.ArgumentList.Add($"--input={_configPath}");
-        startInfo.ArgumentList.Add("--instance=desktop");
+        startInfo.ArgumentList.Add($"--input={configPath}");
+        startInfo.ArgumentList.Add($"--instance={instance}");
 
         _engineProcess = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         _engineProcess.OutputDataReceived += (_, args) => { if (args.Data != null) AppendLog(args.Data); };
@@ -161,7 +212,11 @@ public partial class MainWindow : Window
         {
             AppendLog("搶票程式已停止。");
             SetPaused(false);
-            SetRunningState(false, "已停止");
+            var wasLoginMode = _isLoginMode;
+            _isLoginMode = false;
+            SetRunningState(false, wasLoginMode ? "已儲存登入狀態" : "已停止");
+            if (wasLoginMode)
+                AppendLog("登入狀態已保存，現在可以按「開始搶票」。");
         });
 
         try
@@ -175,6 +230,22 @@ public partial class MainWindow : Window
             AppendLog("啟動失敗：" + exception.Message);
             SetRunningState(false, "啟動失敗");
             MessageBox.Show(exception.Message, "啟動失敗", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RequestEngineQuit(string instance)
+    {
+        try
+        {
+            var quitPath = Path.Combine(AppContext.BaseDirectory, "_engine", "instances", instance,
+                "MAXBOT_INT28_QUIT.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(quitPath)!);
+            File.WriteAllText(quitPath, "quit");
+        }
+        catch (Exception exception)
+        {
+            AppendLog("關閉登入視窗時發生問題：" + exception.Message);
+            StopEngine();
         }
     }
 
@@ -248,7 +319,9 @@ public partial class MainWindow : Window
         StatusText.Text = text;
         StatusDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(running ? "#29A36A" : "#9AA0AA"));
         StartButton.IsEnabled = !running;
-        StopButton.IsEnabled = running;
+        LoginButton.IsEnabled = !running || _isLoginMode;
+        LoginButton.Content = _isLoginMode ? "登入完成" : "先登入 TicketPlus";
+        StopButton.IsEnabled = running && !_isLoginMode;
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e) => StopEngine();
