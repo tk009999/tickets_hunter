@@ -65,7 +65,7 @@ internal static class DefaultConfig
         "block_facebook_network": false,
         "headless": false,
         "user_data_dir": "",
-        "verbose": false,
+        "verbose": true,
         "show_timestamp": true,
         "auto_guess_options": false,
         "user_guess_string": "",

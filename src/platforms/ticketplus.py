@@ -799,6 +799,39 @@ async def nodriver_ticketplus_unified_select(tab, config_dict, area_keyword):
                     return false;
                 }}
 
+                function normalizeMatchText(value) {{
+                    return (value || '')
+                        .toLowerCase()
+                        .replace(/nt\$/g, '')
+                        .replace(/[$＄,，\s]/g, '');
+                }}
+
+                function matchesKeyword(name, value) {{
+                    const normalizedName = normalizeMatchText(name);
+                    const parts = (value || '').trim().split(/\s+/)
+                        .map(normalizeMatchText)
+                        .filter(Boolean);
+                    return parts.length > 0 && parts.every(part => normalizedName.includes(part));
+                }}
+
+                function getPanelSearchText(panel, leafName) {{
+                    const parts = [leafName];
+                    let ancestor = panel.parentElement;
+                    while (ancestor && !ancestor.classList.contains('order-content')) {{
+                        if (ancestor.classList.contains('v-expansion-panel')) {{
+                            const headers = ancestor.querySelectorAll('.v-expansion-panel-header');
+                            for (const candidate of headers) {{
+                                if (candidate.closest('.v-expansion-panel') === ancestor) {{
+                                    parts.push(candidate.textContent || '');
+                                    break;
+                                }}
+                            }}
+                        }}
+                        ancestor = ancestor.parentElement;
+                    }}
+                    return parts.join(' ').trim().replace(/\s+/g, ' ');
+                }}
+
                 function getTargetIndex(items, mode) {{
                     const count = items.length;
                     if (count === 0) return -1;
@@ -830,11 +863,12 @@ async def nodriver_ticketplus_unified_select(tab, config_dict, area_keyword):
                         const nameEl = panel.querySelector('.v-expansion-panel-header');
                         if (nameEl) {{
                             const name = nameEl.textContent.trim().replace(/\\s+/g, ' ');
-                            if (containsExcludeKeywords(name)) continue;
+                            const searchText = getPanelSearchText(panel, name);
+                            if (containsExcludeKeywords(searchText)) continue;
                             if (isSoldOut(panel)) {{
-                                soldOutNames.push(name);
+                                soldOutNames.push(searchText);
                             }} else {{
-                                validPanels.push({{ panel, name, index: i }});
+                                validPanels.push({{ panel, name, searchText, index: i }});
                             }}
                         }}
                     }}
@@ -846,10 +880,10 @@ async def nodriver_ticketplus_unified_select(tab, config_dict, area_keyword):
 
                     let target = null;
                     if (keyword1) {{
-                        target = validPanels.find(p => p.name.includes(keyword1) && (!keyword2 || p.name.includes(keyword2)));
+                        target = validPanels.find(p => matchesKeyword(p.searchText, keyword));
                     }}
                     if (!target && keyword1 && !areaAutoFallback) {{
-                        const keywordInSoldOut = soldOutNames.some(n => n.includes(keyword1) && (!keyword2 || n.includes(keyword2)));
+                        const keywordInSoldOut = soldOutNames.some(n => matchesKeyword(n, keyword));
                         return {{ success: false, strict_mode: true, attempted_keyword: keyword, keyword_in_sold_out: keywordInSoldOut }};
                     }}
                     if (!target) {{
@@ -909,10 +943,10 @@ async def nodriver_ticketplus_unified_select(tab, config_dict, area_keyword):
 
                     let target = null;
                     if (keyword1) {{
-                        target = validRows.find(r => r.name.includes(keyword1) && (!keyword2 || r.name.includes(keyword2)));
+                        target = validRows.find(r => matchesKeyword(r.name, keyword));
                     }}
                     if (!target && keyword1 && !areaAutoFallback) {{
-                        const keywordInSoldOut = soldOutRowNames.some(n => n.includes(keyword1) && (!keyword2 || n.includes(keyword2)));
+                        const keywordInSoldOut = soldOutRowNames.some(n => matchesKeyword(n, keyword));
                         return {{ success: false, strict_mode: true, attempted_keyword: keyword, keyword_in_sold_out: keywordInSoldOut }};
                     }}
                     if (!target) {{
