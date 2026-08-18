@@ -19,9 +19,10 @@ public partial class MainWindow : Window
     private Process? _engineProcess;
     private bool _isPaused;
     private bool _isLoginMode;
+    private string _activeInstance = "desktop";
 
     private string PauseFlagPath => Path.Combine(
-        AppContext.BaseDirectory, "_engine", "instances", "desktop", "MAXBOT_INT28_IDLE.txt");
+        AppContext.BaseDirectory, "_engine", "instances", _activeInstance, "MAXBOT_INT28_IDLE.txt");
 
     public MainWindow()
     {
@@ -138,9 +139,14 @@ public partial class MainWindow : Window
         {
             if (_isLoginMode)
             {
-                RequestEngineQuit("login");
-                AppendLog("正在儲存 TicketPlus 登入狀態…");
-                LoginButton.IsEnabled = false;
+                if (!ValidateInputs()) return;
+                File.WriteAllText(_loginConfigPath, BuildConfig().ToJsonString(new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                }), new UTF8Encoding(false));
+                _isLoginMode = false;
+                SetRunningState(true, "正在搶票");
+                AppendLog("登入完成，保留目前 Chrome，正在前往活動頁開始搶票…");
                 return;
             }
 
@@ -156,7 +162,7 @@ public partial class MainWindow : Window
 
         LogTextBox.Clear();
         AppendLog("正在開啟 TicketPlus 登入頁…");
-        AppendLog("請在 Chrome 完成登入，然後回到這裡按「登入完成」。");
+        AppendLog("請在 Chrome 完成登入，然後回到這裡按「登入完成並開始搶票」。");
         MainTabs.SelectedIndex = 2;
         LaunchEngine(_loginConfigPath, "login", true);
     }
@@ -189,6 +195,7 @@ public partial class MainWindow : Window
         if (File.Exists(staleQuitFlag)) File.Delete(staleQuitFlag);
 
         _isLoginMode = loginMode;
+        _activeInstance = instance;
         SetPaused(false);
         SetRunningState(true, loginMode ? "請在 Chrome 登入 TicketPlus" : "正在搶票");
 
@@ -230,22 +237,6 @@ public partial class MainWindow : Window
             AppendLog("啟動失敗：" + exception.Message);
             SetRunningState(false, "啟動失敗");
             MessageBox.Show(exception.Message, "啟動失敗", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void RequestEngineQuit(string instance)
-    {
-        try
-        {
-            var quitPath = Path.Combine(AppContext.BaseDirectory, "_engine", "instances", instance,
-                "MAXBOT_INT28_QUIT.txt");
-            Directory.CreateDirectory(Path.GetDirectoryName(quitPath)!);
-            File.WriteAllText(quitPath, "quit");
-        }
-        catch (Exception exception)
-        {
-            AppendLog("關閉登入視窗時發生問題：" + exception.Message);
-            StopEngine();
         }
     }
 
@@ -320,7 +311,7 @@ public partial class MainWindow : Window
         StatusDot.Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(running ? "#29A36A" : "#9AA0AA"));
         StartButton.IsEnabled = !running;
         LoginButton.IsEnabled = !running || _isLoginMode;
-        LoginButton.Content = _isLoginMode ? "登入完成" : "先登入 TicketPlus";
+        LoginButton.Content = _isLoginMode ? "登入完成並開始搶票" : "先登入 TicketPlus";
         StopButton.IsEnabled = running && !_isLoginMode;
     }
 
