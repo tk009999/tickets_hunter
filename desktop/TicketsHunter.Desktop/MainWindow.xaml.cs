@@ -15,6 +15,10 @@ public partial class MainWindow : Window
     private readonly string _dataDirectory;
     private readonly string _configPath;
     private Process? _engineProcess;
+    private bool _isPaused;
+
+    private string PauseFlagPath => Path.Combine(
+        AppContext.BaseDirectory, "_engine", "instances", "desktop", "MAXBOT_INT28_IDLE.txt");
 
     public MainWindow()
     {
@@ -132,6 +136,7 @@ public partial class MainWindow : Window
         }
 
         LogTextBox.Clear();
+        SetPaused(false);
         AppendLog("正在啟動本機 Chrome…");
         SetRunningState(true, "正在搶票");
         MainTabs.SelectedIndex = 2;
@@ -155,6 +160,7 @@ public partial class MainWindow : Window
         _engineProcess.Exited += (_, _) => Dispatcher.Invoke(() =>
         {
             AppendLog("搶票程式已停止。");
+            SetPaused(false);
             SetRunningState(false, "已停止");
         });
 
@@ -172,7 +178,45 @@ public partial class MainWindow : Window
         }
     }
 
-    private void StopButton_Click(object sender, RoutedEventArgs e) => StopEngine();
+    private void StopButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_engineProcess is not { HasExited: false }) return;
+
+        SetPaused(!_isPaused);
+        if (_isPaused)
+        {
+            AppendLog("已暫停自動操作，Chrome 會繼續保留。你現在可以手動登入 TicketPlus。");
+            StatusText.Text = "已暫停，可手動操作 Chrome";
+        }
+        else
+        {
+            AppendLog("已恢復自動搶票。");
+            StatusText.Text = "正在搶票";
+        }
+    }
+
+    private void SetPaused(bool paused)
+    {
+        _isPaused = paused;
+        try
+        {
+            if (paused)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(PauseFlagPath)!);
+                File.WriteAllText(PauseFlagPath, "paused");
+            }
+            else if (File.Exists(PauseFlagPath))
+            {
+                File.Delete(PauseFlagPath);
+            }
+        }
+        catch (Exception exception)
+        {
+            AppendLog("切換暫停狀態時發生問題：" + exception.Message);
+        }
+
+        StopButton.Content = paused ? "恢復自動搶票" : "暫停自動操作";
+    }
 
     private void StopEngine()
     {
@@ -189,6 +233,7 @@ public partial class MainWindow : Window
         {
             AppendLog("停止時發生問題：" + exception.Message);
         }
+        SetPaused(false);
         SetRunningState(false, "已停止");
     }
 
