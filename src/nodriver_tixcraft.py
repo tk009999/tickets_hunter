@@ -787,7 +787,17 @@ async def main(args):
     while True:
         await asyncio.sleep(0.05)
 
+        previous_homepage = config_dict.get("homepage", "")
         config_dict, config_mtime = await reload_config(config_dict, config_mtime, config_filepath)
+        current_homepage = config_dict.get("homepage", "")
+        if current_homepage and current_homepage != previous_homepage:
+            print(f"[NAVIGATE] Configuration target changed: {current_homepage}")
+            try:
+                await tab.get(current_homepage)
+                url = current_homepage
+                last_url = ""
+            except Exception as exc:
+                print(f"[ERROR] Failed to navigate to updated homepage: {exc}")
 
         # Phase 3: refresh the liveness heartbeat (throttled to heartbeat_interval_sec).
         heartbeat_now = time.time()
